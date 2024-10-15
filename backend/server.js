@@ -25,8 +25,9 @@ async function testDbConnection() {
 
 testDbConnection();
 
-const categoriesRouter = require('./routes/categories');
-const productsRouter = require('./routes/products')
+const categoriesRouter = require('./routes/category.routes');
+const productsRouter = require('./routes/product.routes');
+const ordersRouter = require('./routes/order.routes');
 
 app.use('/api/categories', categoriesRouter);
 app.use('/api/products', productsRouter);
