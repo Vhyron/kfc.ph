@@ -1,78 +1,52 @@
 const express = require('express');
 const router = express.Router();
-const { Order, Product } = require('../models');
+const { Order, Product, Category } = require('../models');
 
 router.post('/', async (req, res) => {
   try {
-    const { items, totalAmount, isDelivery } = req.body;
+
+    console.log('Request Body:', req.body);
+
+    const { items, isDelivery } = req.body;
     
-    let calculatedTotal = 0;
+    let totalAmount = 0;
     const validatedItems = await Promise.all(items.map(async (item) => {
-      const product = await Product.findByPk(item.productId);
+      const product = await Product.findByPk(item.productId, {
+        include: [{ model: Category, attributes: ['name'] }]
+      });
       if (!product) {
         throw new Error(`Product with id ${item.productId} not found`);
       }
-      calculatedTotal += product.price * item.quantity;
+      totalAmount += product.price * item.quantity;
       return {
         productId: item.productId,
-        quantity: item.quantity,
-        price: product.price
+        name: product.name,
+        description: product.description,
+        price: product.price,
+        category: product.Category.name,
+        quantity: item.quantity
       };
     }));
 
-    if (Math.abs(calculatedTotal - totalAmount) > 0.01) {
-      throw new Error('Total amount mismatch');
-    }
-
     const order = await Order.create({
-      totalAmount: calculatedTotal,
+      totalAmount,
       isDelivery,
-      items: validatedItems
+      items: validatedItems,
+      status: 'completed'
     });
 
-    res.status(201).json(order);
+    const orderDetails = {
+      orderId: order.id,
+      isDelivery: order.isDelivery,
+      status: order.status,
+      totalAmount: order.totalAmount,
+      items: order.items
+    };
+
+    res.status(201).json(orderDetails);
   } catch (error) {
-    console.error('Error creating order:', error);
+    console.error('Error creating order:', error.stack);
     res.status(500).json({ message: 'Error creating order', error: error.message });
-  }
-});
-
-router.get('/', async (req, res) => {
-  try {
-    const orders = await Order.findAll();
-    res.json(orders);
-  } catch (error) {
-    console.error('Error retrieving orders:', error);
-    res.status(500).json({ message: 'Error retrieving orders', error: error.message });
-  }
-});
-
-router.get('/:id', async (req, res) => {
-  try {
-    const order = await Order.findByPk(req.params.id);
-    if (!order) {
-      return res.status(404).json({ message: 'Order not found' });
-    }
-    res.json(order);
-  } catch (error) {
-    console.error('Error retrieving order:', error);
-    res.status(500).json({ message: 'Error retrieving order', error: error.message });
-  }
-});
-
-router.patch('/:id/status', async (req, res) => {
-  try {
-    const { status } = req.body;
-    const order = await Order.findByPk(req.params.id);
-    if (!order) {
-      return res.status(404).json({ message: 'Order not found' });
-    }
-    order.status = status;
-    await order.save();
-    res.json(order);
-  } catch (error) {
-    console.error('Error updating order status:', error);
-    res.status(500).json({ message: 'Error updating order status', error: error.message });
   }
 });
 
